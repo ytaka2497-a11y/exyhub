@@ -1,0 +1,226 @@
+-- Rayfield UI 読み込み
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+local Window = Rayfield:CreateWindow({
+    Name = "じゃがHub",
+    LoadingTitle = "",
+    LoadingSubtitle = "",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil,
+        FileName = "JagaHubConfig"
+    }
+})
+
+local Main = Window:CreateTab("Main", 4483362458)
+
+-- プレイヤー関連
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local humanoid = char:WaitForChild("Humanoid")
+local uis = game:GetService("UserInputService")
+local runService = game:GetService("RunService")
+local mouse = player:GetMouse()
+local vehicle = nil
+
+humanoid.Seated:Connect(function(active, seat)
+    if active and seat:IsA("VehicleSeat") then
+        vehicle = seat.Parent
+    else
+        vehicle = nil
+    end
+end)
+
+-- ▼ 既存 takanasi 機能
+local flying = false
+local flySpeed = 35
+local noclip = false
+local floatPart = Instance.new("Part")
+floatPart.Size = Vector3.new(6,1,6)
+floatPart.Anchored = true
+floatPart.Transparency = 1
+floatPart.CanCollide = true
+floatPart.Parent = workspace
+local floating = false
+
+-- フライ
+Main:CreateToggle({
+    Name = "フライ",
+    CurrentValue = false,
+    Callback = function(Value)
+        flying = Value
+    end
+})
+
+-- 歩行速度
+Main:CreateSlider({
+    Name = "歩行速度",
+    Range = {16,200},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Callback = function(Value)
+        humanoid.WalkSpeed = Value
+    end
+})
+
+-- ジャンプ力
+Main:CreateSlider({
+    Name = "ジャンプ力",
+    Range = {50,300},
+    Increment = 1,
+    Suffix = "Power",
+    CurrentValue = 50,
+    Callback = function(Value)
+        humanoid.UseJumpPower = true
+        humanoid.JumpPower = Value
+    end
+})
+
+-- Noclip
+Main:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Callback = function(Value)
+        noclip = Value
+    end
+})
+
+-- Float
+Main:CreateToggle({
+    Name = "Float",
+    CurrentValue = false,
+    Callback = function(Value)
+        floating = Value
+    end
+})
+
+-- ESP
+Main:CreateButton({
+    Name = "ESP",
+    Callback = function()
+        for _, plr in pairs(game.Players:GetPlayers()) do
+            if plr ~= player and plr.Character then
+                local highlight = Instance.new("Highlight")
+                highlight.Adornee = plr.Character
+                highlight.Parent = plr.Character
+                highlight.FillColor = Color3.new(1,0,0)
+                highlight.OutlineColor = Color3.new(1,1,1)
+            end
+        end
+    end
+})
+
+-- 透明化
+Main:CreateButton({
+    Name = "透明化",
+    Callback = function()
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = 0.5
+            end
+        end
+    end
+})
+
+-- 目の前TP
+Main:CreateButton({
+    Name = "目の前TP",
+    Callback = function()
+        if mouse.Hit and char.PrimaryPart then
+            char:SetPrimaryPartCFrame(CFrame.new(mouse.Hit.Position + Vector3.new(0,3,0)))
+        end
+    end
+})
+
+-- 完全透明
+Main:CreateButton({
+    Name = "完全透明",
+    Callback = function()
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = 1
+                if part:IsA("BasePart") then part.CanCollide = true end
+            end
+        end
+    end
+})
+
+-- ▼ TPWalk 機能追加
+local moving = false
+local targetPos = nil
+local tpSpeed = 50
+
+Main:CreateButton({
+    Name = "TPWalk",
+    Callback = function()
+        if mouse.Hit then
+            targetPos = mouse.Hit.Position
+            moving = true
+        end
+    end
+})
+
+Main:CreateSlider({
+    Name = "TPWalk Speed",
+    Range = {16,200},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = tpSpeed,
+    Callback = function(Value)
+        tpSpeed = Value
+    end
+})
+
+-- ▼ 外部スクリプトロードボタン
+Main:CreateButton({
+    Name = "別スクリプト起動",
+    Callback = function()
+        loadstring(game:HttpGet("https://pastefy.app/A8Kfs9KV/raw", true))()
+    end
+})
+
+-- ▼ RunServiceで動作管理
+runService.RenderStepped:Connect(function(delta)
+    -- フライ
+    if flying then
+        local cam = workspace.CurrentCamera
+        local moveDir = Vector3.new()
+        if uis:IsKeyDown(Enum.KeyCode.W) then moveDir += cam.CFrame.LookVector end
+        if uis:IsKeyDown(Enum.KeyCode.S) then moveDir -= cam.CFrame.LookVector end
+        if uis:IsKeyDown(Enum.KeyCode.A) then moveDir -= cam.CFrame.RightVector end
+        if uis:IsKeyDown(Enum.KeyCode.D) then moveDir += cam.CFrame.RightVector end
+        if uis:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0,1,0) end
+        if uis:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir += Vector3.new(0,-1,0) end
+        if moveDir.Magnitude > 0 then
+            if vehicle and vehicle.PrimaryPart then
+                vehicle.PrimaryPart.Velocity = moveDir.Unit * flySpeed
+            else
+                hrp.Velocity = moveDir.Unit * flySpeed
+            end
+        end
+    end
+
+    -- Noclip
+    if noclip and char then
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = false end
+        end
+    end
+
+    -- Float
+    if floating and char and hrp then
+        floatPart.Position = hrp.Position - Vector3.new(0,3,0)
+    end
+
+    -- TPWalk
+    if moving and targetPos then
+        local dir = Vector3.new(targetPos.X - hrp.Position.X, 0, targetPos.Z - hrp.Position.Z)
+        local dist = dir.Magnitude
+        if dist > 1 then
+            hrp.CFrame = hrp.CFrame + dir.Unit * tpSpeed * delta
+        else
+            moving = false
+        end
+    end
+end)
